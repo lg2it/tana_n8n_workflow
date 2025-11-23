@@ -1,0 +1,119 @@
+{
+  "name": "Tana Exa Search",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "REPLACE_WITH_YOUR_WEBHOOK_PATH",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -544,
+        -240
+      ],
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.exa.ai/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"={{$json.body.query}}\",\n  \"type\": \"auto\",\n  \"numResults\": 10,\n  \"text\": true,\n  \"summary\": true\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -336,
+        -240
+      ],
+      "name": "Exa Search",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_EXA_CREDENTIAL_ID",
+          "name": "Exa"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. 从 Webhook 节点拿 query\nconst webhookOutput = $node[\"Webhook\"].json;\nconst query = webhookOutput.body?.query || \"(no query)\";\n\n// 2. 从 Exa Search 节点（当前输入）拿结果\nconst exaData = items[0].json;\nconst results = Array.isArray(exaData.results) ? exaData.results : [];\n\n// 3. 生成嵌套 <ul><li> 结构的 HTML\nlet html = \"\";\nhtml += `<h2>Exa 搜索结果：${query}</h2>`;\nhtml += \"<ul>\";\n\nresults.slice(0, 10).forEach((r, idx) => {\n  const title =\n    (r.title && r.title.trim() !== \"\" ? r.title : null) ||\n    r.url ||\n    `Result ${idx + 1}`;\n\n  html += `<li>${idx + 1}. ${title}<ul>`;\n\n  if (r.url) {\n    html += `<li>${r.url}</li>`;\n  }\n  if (r.publishedDate) {\n    html += `<li>Published: ${r.publishedDate}</li>`;\n  }\n  if (r.author) {\n    html += `<li>Author: ${r.author}</li>`;\n  }\n\n  html += `</ul></li>`;\n});\n\nhtml += \"</ul>\";\n\n// 4. 返回给 Respond to Webhook\nreturn [\n  {\n    json: {\n      body: html\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -240
+      ],
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        80,
+        -240
+      ],
+      "name": "Reply to Tana"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Exa Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exa Search": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Reply to Tana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

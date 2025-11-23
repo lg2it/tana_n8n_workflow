@@ -1,0 +1,119 @@
+{
+  "name": "Readwise Archived Article to Tana (Sanitized)",
+  "nodes": [
+    {
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours" }]
+        }
+      }
+    },
+    {
+      "name": "Calculate Time Window",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const now = new Date(); const twoHoursAgo = new Date(now.getTime() - 2*60*60*1000); return [{ json: { updatedAfter: twoHoursAgo.toISOString(), currentTime: now.toISOString() }}];"
+      }
+    },
+    {
+      "name": "Reader — List Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "https://readwise.io/api/v3/list/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "REPLACE_WITH_YOUR_READWISE_CREDENTIAL_ID",
+            "name": "Readwise"
+          }
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "location", "value": "archive" },
+            { "name": "category", "value": "article" },
+            { "name": "updatedAfter", "value": "={{ $json.updatedAfter }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      }
+    },
+    {
+      "name": "Split Out",
+      "type": "n8n-nodes-base.splitOut",
+      "parameters": {
+        "fieldToSplitOut": "results"
+      }
+    },
+    {
+      "name": "Filter & Map Reader Articles",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// same logic, no sensitive info"
+      }
+    },
+    {
+      "name": "Get All Imported IDs",
+      "type": "n8n-nodes-base.dataTable",
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "value": "REPLACE_WITH_YOUR_DATATABLE_ID"
+        }
+      }
+    },
+    {
+      "name": "Filter New Articles",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// same logic, safe"
+      }
+    },
+    {
+      "name": "Build Tana Payload",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const BOOKMARK_SUPERTAG_ID = 'REPLACE_SUPERTAG_ID'; const FIELD_IDS = { URL: 'REPLACE_URL_FIELD', READER: 'REPLACE_READER_FIELD', TAGS: 'REPLACE_TAGS_FIELD', SUMMARY: 'REPLACE_SUMMARY_FIELD', READER_ID: 'REPLACE_READERID_FIELD' }; // rest unchanged"
+      }
+    },
+    {
+      "name": "Tana Input API",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "https://europe-west1-tagr-prod.cloudfunctions.net/addToNodeV2",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "REPLACE_WITH_YOUR_TANA_CREDENTIAL_ID",
+            "name": "Tana"
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}"
+      }
+    },
+    {
+      "name": "Record as Imported",
+      "type": "n8n-nodes-base.dataTable",
+      "parameters": {
+        "dataTableId": {
+          "value": "REPLACE_WITH_YOUR_DATATABLE_ID"
+        },
+        "columns": {
+          "value": {
+            "reader_id": "={{ $json.reader_id }}",
+            "title": "={{ $json.title }}"
+          }
+        }
+      }
+    }
+  ]
+}

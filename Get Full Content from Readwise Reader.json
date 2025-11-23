@@ -1,0 +1,148 @@
+{
+  "name": "Get Full Content from Readwise Reader",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "REPLACE_WITH_YOUR_WEBHOOK_PATH",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -464,
+        -32
+      ],
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 拿到 Webhook 传来的 Reader URL\nconst readerUrl = $json.body.Reader;\n\n// 从 URL 中提取 /read/ 后面的那段 ID\n// 例如: https://read.readwise.io/read/01k9prgvm9c0paydeetfzx90yk\nlet id = null;\nif (typeof readerUrl === 'string') {\n  const match = readerUrl.match(/\\/read\\/([a-zA-Z0-9]+)/);\n  if (match) {\n    id = match[1];\n  }\n}\n\nreturn [\n  {\n    json: {\n      id,\n      rawReaderUrl: readerUrl,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        -32
+      ],
+      "name": "Extract ID"
+    },
+    {
+      "parameters": {
+        "url": "=https://readwise.io/api/v3/list/?id={{ $json.id }}&withHtmlContent=true",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -32,
+        -32
+      ],
+      "name": "Readwise Reader",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_READWISE_CREDENTIAL_ID",
+          "name": "Readwise"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Readwise Reader 节点的输出在 $json 里\nconst res = $json;\n\n// 默认值\nlet html = 'No html_content found';\n\nif (res.results && Array.isArray(res.results) && res.results[0]?.html_content) {\n  html = res.results[0].html_content;\n}\n\nreturn [\n  {\n    json: {\n      html,\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        -32
+      ],
+      "name": "Extract HTML"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        384,
+        -32
+      ],
+      "name": "Reply to Tana"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract ID": {
+      "main": [
+        [
+          {
+            "node": "Readwise Reader",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Readwise Reader": {
+      "main": [
+        [
+          {
+            "node": "Extract HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract HTML": {
+      "main": [
+        [
+          {
+            "node": "Reply to Tana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}
